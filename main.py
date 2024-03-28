@@ -7,7 +7,9 @@ from typing import Any
 
 
 class Monitor:
-    def __init__(self, broker="localhost", port=1883, topic="zigbee2mqtt/+/availability", openhab_ip=None, openhab_port=8080, openhab_item="z2m_offline_devices_list"):
+    def __init__(self, broker="localhost", port=1883, topic="zigbee2mqtt/+/availability",
+                 openhab_ip=None, openhab_port=8080, openhab_item="z2m_offline_devices_list",
+                 report_when_disconnected=False):
         self.broker = broker
         self.port = port
         self.topic = topic
@@ -15,11 +17,16 @@ class Monitor:
         self.openhab_port = openhab_port
         self.openhab_item = openhab_item
         self.client_id = 'z2m-availability-monitor'
+        self.report_when_disconnected = report_when_disconnected
         self.client: mqtt_client = self.connect_mqtt()
         self.client.subscribe(self.topic)
         self.client.on_message = self.on_message
+        self.client.on_disconnect = self.on_disconnect
         self.device_availability: dict[str, bool] = {}
         self.client.loop_forever()
+
+    def __del__(self):
+        self.on_disconnect()
 
     @classmethod
     def generate_default_config_dict(cls) -> dict[str, Any]:
@@ -37,6 +44,10 @@ class Monitor:
             print("Connected to MQTT Broker!")
         else:
             print("Failed to connect, return code %d\n", rc)
+
+    def on_disconnect(self, *args, **kwargs):
+        url = f"http://{self.openhab_ip}:{self.openhab_port}/rest/items/{self.openhab_item}"
+        requests.post(url, data=self.client_id.encode("utf-8"), headers={'Content-Type': 'text/plain'})
 
     def connect_mqtt(self) -> mqtt_client:
         client = mqtt_client.Client(self.client_id)
