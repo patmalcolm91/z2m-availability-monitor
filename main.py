@@ -1,9 +1,13 @@
 from paho.mqtt import client as mqtt_client
 import requests
+import yaml
+import os
+import inspect
+from typing import Any
 
 
 class Monitor:
-    def __init__(self, broker, port=1883, topic="zigbee2mqtt/+/availability", openhab_ip=None, openhab_port=8080, openhab_item="z2m_offline_devices_list"):
+    def __init__(self, broker="localhost", port=1883, topic="zigbee2mqtt/+/availability", openhab_ip=None, openhab_port=8080, openhab_item="z2m_offline_devices_list"):
         self.broker = broker
         self.port = port
         self.topic = topic
@@ -16,6 +20,16 @@ class Monitor:
         self.client.on_message = self.on_message
         self.device_availability: dict[str, bool] = {}
         self.client.loop_forever()
+
+    @classmethod
+    def generate_default_config_dict(cls) -> dict[str, Any]:
+        """Generate a dict of the default parameters to __init__()."""
+        cfg = {}
+        for param_name, param in inspect.signature(cls.__init__).parameters.items():
+            if param_name == "self":
+                continue
+            cfg[param_name] = param.default
+        return cfg
 
     @staticmethod
     def on_connect(client, userdata, flags, rc):
@@ -47,7 +61,19 @@ class Monitor:
 
 
 def run():
-    monitor = Monitor("g3")
+    # if there is no config file present, generate a default one
+    if not os.path.exists("data"):
+        print("Creating data folder")
+        os.mkdir("data")
+    if not os.path.exists(os.path.join("data", "config.yaml")):
+        print("Generating default config file.")
+        with open(os.path.join("data", "config.yaml"), "w") as f:
+            yaml.dump(Monitor.generate_default_config_dict(), f)
+    # load the config file
+    with open(os.path.join("data", "config.yaml"), "r") as f:
+        cfg = yaml.load(f, Loader=yaml.Loader)
+    # create and run the monitor daemon
+    monitor = Monitor(**cfg)
 
 
 if __name__ == '__main__':
