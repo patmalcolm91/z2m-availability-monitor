@@ -46,8 +46,9 @@ class Monitor:
             print("Failed to connect, return code %d\n", rc)
 
     def on_disconnect(self, *args, **kwargs):
-        url = f"http://{self.openhab_ip}:{self.openhab_port}/rest/items/{self.openhab_item}"
-        requests.post(url, data=self.client_id.encode("utf-8"), headers={'Content-Type': 'text/plain'})
+        if self.report_when_disconnected:
+            url = f"http://{self.openhab_ip}:{self.openhab_port}/rest/items/{self.openhab_item}"
+            requests.post(url, data=self.client_id.encode("utf-8"), headers={'Content-Type': 'text/plain'})
 
     def connect_mqtt(self) -> mqtt_client:
         client = mqtt_client.Client(self.client_id)
