@@ -77,7 +77,6 @@ class Monitor:
             raise ConnectionError(f"Failed to update openhab item '{self.openhab_item}'.")
 
     def update_openhab_item(self):
-        return DummyResponse(200)
         url = f"http://{self.openhab_ip}:{self.openhab_port}/rest/items/{self.openhab_item}"
         device_list = ", ".join([dev for dev, avail in self.device_availability.items() if not avail])
         result = requests.post(url, data=device_list.encode("utf-8"), headers={'Content-Type': 'text/plain'})
