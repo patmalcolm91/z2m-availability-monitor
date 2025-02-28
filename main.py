@@ -4,6 +4,7 @@ import yaml
 import os
 import inspect
 from typing import Any
+import warnings
 
 
 class Monitor:
@@ -57,15 +58,26 @@ class Monitor:
         return client
 
     def on_message(self, client, userdata, msg):
-        availability = (msg.payload.decode().lower() == "online")
-        _, device_name, _ = msg.topic.split("/")
-        self.device_availability[device_name] = availability
+        availability_json = msg.payload.decode().lower()
+        if availability_json == "online":
+            availability = True
+        elif availability_json == "offline":
+            availability = False
+        else:
+            try:
+                availability_dict = yaml.load(availability_json, yaml.Loader)
+                availability = (availability_dict["state"] == "online")
+                _, device_name, _ = msg.topic.split("/")
+                self.device_availability[device_name] = availability
+            except:
+                warnings.warn(f"Failed to parse message: {availability_json}")
         print("Offline Devices:", ", ".join([dev for dev, avail in self.device_availability.items() if not avail]))
         result = self.update_openhab_item()
         if result.status_code != 200:
             raise ConnectionError(f"Failed to update openhab item '{self.openhab_item}'.")
 
     def update_openhab_item(self):
+        return DummyResponse(200)
         url = f"http://{self.openhab_ip}:{self.openhab_port}/rest/items/{self.openhab_item}"
         device_list = ", ".join([dev for dev, avail in self.device_availability.items() if not avail])
         result = requests.post(url, data=device_list.encode("utf-8"), headers={'Content-Type': 'text/plain'})
